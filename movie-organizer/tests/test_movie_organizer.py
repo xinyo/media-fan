@@ -180,7 +180,7 @@ class TmdbTests(unittest.TestCase):
         self.assertEqual(root.findtext("fileinfo/streamdetails/video/codec"), "h265")
 
     def test_dry_run_has_no_file_changes(self):
-        with tempfile.TemporaryDirectory() as temp, mock.patch.dict(os.environ, {"TMDB_BEARER_TOKEN": "secret"}):
+        with tempfile.TemporaryDirectory() as temp, mock.patch.dict(os.environ, {"TMDB_API_KEY": "secret"}):
             folder = Path(temp) / "release"; folder.mkdir()
             video = folder / "Movie.2001.mkv"; video.write_bytes(b"video")
             before = {p.relative_to(folder): p.read_bytes() for p in folder.rglob("*") if p.is_file()}

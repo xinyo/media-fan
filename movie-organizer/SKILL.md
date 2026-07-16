@@ -82,7 +82,7 @@ Do not rerun already completed apply steps blindly. Use the returned paths and f
 
 - `tmdb_nfo.py` fetches confirmed TMDB metadata in `zh-CN` with `en-US` fallback, inspects streams with `ffprobe`, validates XML, and atomically replaces supported TMDB artwork. TMDB supplies only posters, backdrops, and logos; do not invent unsupported art types.
 - `rename_media.py` preflights every collision, preserves the video extension and subtitle language/forced/SDH tags, and leaves uncertain subtitles unchanged.
-- `subtitles.py` requires a full English subtitle for English audio and full English plus Simplified Chinese for other audio. Forced/commentary tracks never satisfy a requirement; Traditional Chinese remains distinct. Search OpenSubtitles.com first, SubDL second, and SubHD (scraped) third as a last resort. When all three providers fail, see `references/subhd-subtitle-extraction.md` for manual SubHD download as a fallback.
+- `subtitles.py` requires a full English subtitle for English audio and full English plus Simplified Chinese for other audio. Forced/commentary tracks never satisfy a requirement; Traditional Chinese remains distinct. Search OpenSubtitles.com first, SubDL second, and SubHD (scraped) third as a last resort. When all three providers fail, SubHD can be downloaded manually — see the local `~/.hermes/skills/media/movie-organizer/references/subhd-subtitle-extraction.md` reference.
 - `move_movie.py` verifies the video, NFO, and required subtitles, refuses collisions, and keeps the source intact if a cross-filesystem copy fails.
 
 ## Pitfalls
@@ -119,7 +119,4 @@ A loose (unfoldered) video must be staged into a sibling work folder before appl
 
 ## Reference files
 
-- `references/setup.md` — Environment variables, auth details, path mapping, routing rules, and known issues.
-- `references/editing-dotenv.md` — How to view and modify `~/.hermes/.env` when file tools are blocked (credential store protection).
-- `references/loose-video-workflow.md` — Concrete step-by-step for processing loose (unfoldered) videos: subtitle rename, staging, dry-run, apply, cleanup.
-- `references/subhd-subtitle-extraction.md` — How to extract subtitles from SubHD (subhd.tv) when API-based providers fail. Covers the embedded `data-content` format, custom number|text parsing, and conversion to standard SRT.
+(Reference docs with environment-specific paths and credentials are kept locally under `~/.hermes/skills/media/movie-organizer/references/` and are not included in the public repo.)

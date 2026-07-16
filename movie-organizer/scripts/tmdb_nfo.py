@@ -53,10 +53,11 @@ def normalize_language(value: Any) -> str:
 
 
 def _http_json(url: str, token: str, timeout: int = 30) -> dict[str, Any]:
+    separator = "&" if "?" in url else "?"
+    url = f"{url}{separator}api_key={token}"
     request = urllib.request.Request(
         url,
         headers={
-            "Authorization": f"Bearer {token}",
             "Accept": "application/json",
             "User-Agent": "movie-organizer-skill/1.0",
         },
@@ -531,9 +532,9 @@ def create_state(args: argparse.Namespace) -> dict[str, Any]:
         raise OrganizerError(f"unsupported movie extension: {video.suffix}")
     if args.mode == "apply" and args.loose:
         raise OrganizerError("stage a loose movie in its sibling work folder before apply mode")
-    token = os.environ.get("TMDB_BEARER_TOKEN", "")
+    token = os.environ.get("TMDB_API_KEY", "")
     if not token:
-        raise OrganizerError("TMDB_BEARER_TOKEN is required")
+        raise OrganizerError("TMDB_API_KEY is required")
     zh, en, images = fetch_tmdb_movie(args.tmdb_id, token)
     movie = build_movie_metadata(args.tmdb_id, zh, en)
     media = inspect_media(video, Path(args.ffprobe_json) if args.ffprobe_json else None)

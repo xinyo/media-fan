@@ -21,7 +21,7 @@ Organize exactly one waiting movie at a time. Treat identification and approval 
 2. Inspect folder and filenames, existing NFO data, `ffprobe` streams and format tags, runtime, edition/source hints, and the first default non-commentary audio stream.
 3. Search TMDB using likely title and release year. Compare localized, original, and English titles, year, runtime, original language, and production countries.
 4. If multiple candidates remain plausible, show the evidence and ask the user to choose. Always show the final title, year, and TMDB ID and obtain confirmation before invoking scripts.
-5. Require `python3`, `ffprobe`, and `TMDB_BEARER_TOKEN`. Missing subtitle provider credentials are allowed only when no subtitle download is needed.
+5. Require `python3`, `ffprobe`, and `TMDB_API_KEY`.
 
 ## Preview
 

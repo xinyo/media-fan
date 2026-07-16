@@ -16,7 +16,7 @@ from typing import Any, Callable
 import xml.etree.ElementTree as ET
 
 
-DEFAULT_DESTINATION = Path("/lib3/media/movie")
+DEFAULT_DESTINATION = Path("/mnt/lib3/media/movie")
 SOUTHEAST_ASIAN = {"th", "vi", "id", "ms", "tl", "fil", "km", "my", "lo"}
 CHINESE = {"zh", "zh-cn", "zh-tw", "cmn", "yue"}
 SUBTITLE_EXTENSIONS = {".srt", ".ass", ".ssa"}

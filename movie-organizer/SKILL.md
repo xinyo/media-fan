@@ -1,6 +1,6 @@
 ---
 name: movie-organizer
-description: Safely identify, preview, rename, enrich, subtitle, and route movies from /lib3/waiting/movie-- into /lib3/media/movie. Use when Codex needs to organize a waiting movie, create Kodi-compatible TMDB metadata and artwork, normalize movie and subtitle names, obtain required English or Simplified Chinese subtitles, or move a completed movie into the language library after an explicitly approved dry run.
+description: Safely identify, preview, rename, enrich, subtitle, and route movies from /mnt/lib3/waiting/movie-- into /mnt/lib3/media/movie. Use when Codex needs to organize a waiting movie, create Kodi-compatible TMDB metadata and artwork, normalize movie and subtitle names, obtain required English or Simplified Chinese subtitles, or move a completed movie into the language library after an explicitly approved dry run.
 ---
 
 # Movie Organizer
@@ -17,7 +17,7 @@ Organize exactly one waiting movie at a time. Treat identification and approval 
 
 ## Inspect and identify
 
-1. Select the next folder or loose video in `/lib3/waiting/movie--`; never batch movies.
+1. Select the next folder or loose video in `/mnt/lib3/waiting/movie--`; never batch movies.
 2. Inspect folder and filenames, existing NFO data, `ffprobe` streams and format tags, runtime, edition/source hints, and the first default non-commentary audio stream.
 3. Search TMDB using likely title and release year. Compare localized, original, and English titles, year, runtime, original language, and production countries.
 4. If multiple candidates remain plausible, show the evidence and ask the user to choose. Always show the final title, year, and TMDB ID and obtain confirmation before invoking scripts.

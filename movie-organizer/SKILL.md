@@ -1,11 +1,25 @@
 ---
 name: movie-organizer
-description: Safely identify, preview, rename, enrich, subtitle, and route movies from /mnt/lib3/waiting/movie-- into /mnt/lib3/media/movie. Use when Codex needs to organize a waiting movie, create Kodi-compatible TMDB metadata and artwork, normalize movie and subtitle names, obtain required English or Simplified Chinese subtitles, or move a completed movie into the language library after an explicitly approved dry run.
+description: Safely identify, preview, rename, enrich, subtitle, and route movies from `$MOVIE_INPUT` into `$MOVIE_OUTPUT` by language.
 ---
 
 # Movie Organizer
 
 Organize exactly one waiting movie at a time. Treat identification and approval as agent decisions; use the scripts only for deterministic work after confirming a TMDB ID.
+
+## Configuration
+
+Set these environment variables (copy `.env.example` to `.env`):
+
+| Variable | Default | Required |
+|---|---|---|
+| `MOVIE_INPUT` | `/mnt/lib3/waiting/movie--` | Path to unorganized movies |
+| `MOVIE_OUTPUT` | `/mnt/lib3/media/movie` | Root for organized movie folders |
+| `TMDB_API_KEY` | — | TMDB API key (get at themoviedb.org) |
+| `OPENSUBTITLES_API_KEY` | — | For subtitle download (optional) |
+| `SUB DL_API_KEY` | — | Fallback subtitle provider (optional) |
+
+All scripts fall back to sensible defaults when variables are unset. Only `TMDB_API_KEY` is strictly required for metadata and artwork.
 
 ## Safety contract
 
@@ -17,7 +31,7 @@ Organize exactly one waiting movie at a time. Treat identification and approval 
 
 ## Inspect and identify
 
-1. Select the next folder or loose video in `/mnt/lib3/waiting/movie--`; never batch movies.
+1. Select the next folder or loose video in `$MOVIE_INPUT`; never batch movies.
 2. Inspect folder and filenames, existing NFO data, `ffprobe` streams and format tags, runtime, edition/source hints, and the first default non-commentary audio stream.
 3. Search TMDB using likely title and release year. Compare localized, original, and English titles, year, runtime, original language, and production countries.
 4. If multiple candidates remain plausible, show the evidence and ask the user to choose. Always show the final title, year, and TMDB ID and obtain confirmation before invoking scripts.

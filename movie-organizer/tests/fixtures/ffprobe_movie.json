@@ -1,0 +1,51 @@
+{
+  "streams": [
+    {
+      "index": 0,
+      "codec_type": "video",
+      "codec_name": "hevc",
+      "profile": "Main 10",
+      "width": 3840,
+      "height": 2160,
+      "color_transfer": "smpte2084",
+      "color_primaries": "bt2020",
+      "side_data_list": [{"side_data_type": "DOVI configuration record"}],
+      "duration": "7500.25"
+    },
+    {
+      "index": 1,
+      "codec_type": "audio",
+      "codec_name": "truehd",
+      "channels": 8,
+      "tags": {"language": "jpn", "title": "Main Audio"},
+      "disposition": {"default": 1}
+    },
+    {
+      "index": 2,
+      "codec_type": "audio",
+      "codec_name": "aac",
+      "channels": 2,
+      "tags": {"language": "eng", "title": "Director Commentary"},
+      "disposition": {"default": 0}
+    },
+    {
+      "index": 3,
+      "codec_type": "subtitle",
+      "codec_name": "subrip",
+      "tags": {"language": "eng", "title": "English SDH"},
+      "disposition": {"forced": 0, "hearing_impaired": 1}
+    },
+    {
+      "index": 4,
+      "codec_type": "subtitle",
+      "codec_name": "subrip",
+      "tags": {"language": "chi", "title": "Forced signs"},
+      "disposition": {"forced": 1}
+    }
+  ],
+  "format": {
+    "format_name": "matroska,webm",
+    "duration": "7500.25",
+    "tags": {"title": "Fixture Movie (2001)"}
+  }
+}

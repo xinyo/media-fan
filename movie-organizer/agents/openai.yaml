@@ -1,0 +1,4 @@
+interface:
+  display_name: "Movie Organizer"
+  short_description: "Safely identify and organize movie downloads"
+  default_prompt: "Use $movie-organizer to inspect and safely organize movies after an approved dry run."

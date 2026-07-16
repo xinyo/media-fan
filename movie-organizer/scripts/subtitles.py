@@ -256,6 +256,350 @@ class SubDLClient:
         return self.downloader(f"{url}{separator}{urllib.parse.urlencode({'api_key': self.api_key})}", {"x-api-key": self.api_key})
 
 
+class SubHDClient:
+    """Scrape subtitles from subhd.tv (no API key needed) as a last-resort provider.
+
+    SubHD is a Chinese subtitle community. It has no public API — subtitles are
+    embedded directly in the HTML page inside a ``data-content`` attribute in a
+    custom number-prefixed format that must be converted to standard SRT.
+
+    The provider is always appended last, after OpenSubtitles and SubDL.
+    """
+
+    BASE_URL = "https://subhd.tv"
+    SUBHD_UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+    def __init__(self) -> None:
+        self._html_cache: dict[str, str] = {}
+
+    # ------------------------------------------------------------------
+    # HTML helpers (no BeautifulSoup dependency)
+    # ------------------------------------------------------------------
+
+    def _fetch_html(self, url: str) -> str:
+        if url in self._html_cache:
+            return self._html_cache[url]
+        req = urllib.request.Request(
+            url, headers={"User-Agent": self.SUBHD_UA},
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                raw = resp.read()
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            raise OrganizerError(f"SubHD request failed: {exc}") from exc
+        text = raw.decode("utf-8", "replace")
+        self._html_cache[url] = text
+        return text
+
+    @staticmethod
+    def _extract_attr(html: str, attr: str) -> list[str]:
+        """Extract values of ``attr="..."`` from a block of HTML."""
+        return re.findall(rf'{re.escape(attr)}="([^"]*)"', html)
+
+    @staticmethod
+    def _subtitle_code_from_page(html: str) -> str | None:
+        """Find the first ``/a/{code}`` link on a subtitle detail page."""
+        codes = re.findall(r'href="/a/([a-zA-Z0-9]+)"', html)
+        return codes[0] if codes else None
+
+    # ------------------------------------------------------------------
+    # Search
+    # ------------------------------------------------------------------
+
+    def search(self, movie: dict[str, Any], release_name: str, language: str) -> list[dict[str, Any]]:
+        """Search subhd.tv for subtitles matching ``movie``.
+
+        Strategy:
+          1. Build a search query from the Chinese TMDB title + year.
+          2. Fetch the search-results page.
+          3. Locate the movie-detail page ``/d/{id}`` that best matches our title.
+          4. Fetch the movie page and extract every subtitle listing.
+          5. Filter by the requested language and return candidates.
+        """
+        # -- build search query -------------------------------------------
+        year = movie.get("year", "")
+        zh_title = (movie.get("title") or "").strip()
+        en_title = (movie.get("original_title") or movie.get("title") or "").strip()
+        query_candidates = []
+        if zh_title:
+            query_candidates.append(f"{zh_title} {year}".strip())
+        if en_title and en_title != zh_title:
+            query_candidates.append(f"{en_title} {year}".strip())
+        if not query_candidates:
+            query_candidates.append(release_name)
+
+        # -- find the movie page on SubHD ---------------------------------
+        movie_id = self._resolve_movie_id(query_candidates, release_name)
+        if not movie_id:
+            return []
+
+        # -- fetch the movie detail page (all subtitles for this movie) ----
+        try:
+            movie_html = self._fetch_html(f"{self.BASE_URL}/d/{movie_id}")
+        except OrganizerError:
+            return []
+
+        return self._parse_movie_subtitles(movie_html, language)
+
+    def _resolve_movie_id(self, query_candidates: list[str], release_name: str) -> str | None:
+        """Search SubHD and return the ``/d/{id}`` of the best-matching movie.
+
+        The search-results page lists subtitle cards, each linked to a movie
+        detail page via a poster image link.  Sidebar widgets on the same page
+        also contain ``/d/{id}`` links for unrelated movies, so we only trust
+        IDs that appear inside a search-result card (identified by a ``pics``
+        div containing a poster ``<img>``).
+        """
+        for query in query_candidates:
+            query_encoded = urllib.parse.quote(query)
+            try:
+                html = self._fetch_html(f"{self.BASE_URL}/search/{query_encoded}")
+            except OrganizerError:
+                continue
+
+            # Find the movie ID from the poster link inside a result card.
+            # Each card has: <a href='/d/{id}'> <div class="pics"><img src="...poster/...">
+            match = re.search(
+                r"href=['\"]/d/(\d+)['\"][^>]*>\s*<div class=\"pics\"",
+                html,
+            )
+            if match:
+                return match.group(1)
+
+            # Fallback: any /d/ ID that appears right before a poster image
+            match = re.search(
+                r'href=["\']/d/(\d+)["\'][^>]*>.*?<img[^>]*poster/',
+                html,
+                re.DOTALL,
+            )
+            if match:
+                return match.group(1)
+
+        return None
+
+    def _parse_movie_subtitles(self, html: str, language: str) -> list[dict[str, Any]]:
+        """Parse subtitle entries from a movie detail page (``/d/{id}``)."""
+        candidates: list[dict[str, Any]] = []
+
+        # Each subtitle entry looks like:
+        #   <div class="row pt-2 mb-2">
+        #     <a class="link-dark" href="/a/tSOfPy">release name</a>
+        #     <span>双语</span> <span>简体</span> <span>英语</span>
+        #     <span class="text-secondary">SRT</span>
+        #   </div>
+        #
+        # We split on the row delimiter and parse each block.
+
+        blocks = re.split(r'<div class="row pt-2 mb-2">', html)
+        for block in blocks:
+            code_match = re.search(r'href="/a/([a-zA-Z0-9]+)"', block)
+            if not code_match:
+                continue
+            code = code_match.group(1)
+
+            # Release name
+            rel_match = re.search(r'href="/a/[^"]*"[^>]*>([^<]+)</a>', block)
+            release_name = rel_match.group(1).strip() if rel_match else ""
+
+            # Format (.srt / .ass / .ssa)
+            fmt_match = re.search(
+                r'<span class="p-1 text-secondary">(\w+)</span>', block,
+            )
+            fmt = fmt_match.group(1).casefold() if fmt_match else "srt"
+
+            # Download count
+            dl_match = re.search(
+                r'<div class="px-3 py-2 text-end text-secondary">(\d+)</div>',
+                block,
+            )
+            downloads = int(dl_match.group(1)) if dl_match else 0
+
+            # Language tags: the tags before the format span
+            tags = re.findall(
+                r'<span class="p-1 fw-bold">([^<]+)</span>', block,
+            )
+            tag_text = " ".join(tags)
+
+            # Determine candidate language
+            cand_lang = self._resolve_language(tag_text)
+
+            # Skip if language doesn't match what we need
+            if language == "zh-CN" and cand_lang not in ("zh-CN", "zh"):
+                continue
+            if language == "en" and cand_lang not in ("en",):
+                continue
+
+            candidates.append({
+                "provider": "SubHD",
+                "code": code,
+                "file_name": f"{release_name}.{fmt}",
+                "release_name": release_name,
+                "language": cand_lang if cand_lang != "zh" else "zh-CN",
+                "format": fmt,
+                "downloads": downloads,
+                "rating": 0.0,
+                "sdh": False,
+                "forced": False,
+                "commentary": False,
+                "tmdb_id": None,
+                "imdb_id": None,
+                "year": None,
+                # Pre-populate score fields for rank_candidate
+                "score": 0.0,
+            })
+
+        return candidates
+
+    @staticmethod
+    def _resolve_language(tag_text: str) -> str:
+        """Infer canonical language from SubHD tag text."""
+        t = tag_text.casefold()
+        if "双语" in t:
+            return "zh-CN"  # bilingual — default to Simplified Chinese
+        if "简体" in t or "简" in t or "chs" in t:
+            return "zh-CN"
+        if "繁体" in t or "繁" in t or "cht" in t:
+            return "zh-TW"
+        if "英语" in t or "英文" in t or "en" in t:
+            return "en"
+        # Fallback: check for Chinese characters in the release name later
+        return "zh-CN"
+
+    # ------------------------------------------------------------------
+    # Fetch & Convert
+    # ------------------------------------------------------------------
+
+    def fetch(self, candidate: dict[str, Any]) -> bytes:
+        """Fetch the subtitle detail page, extract ``data-content``, and
+        return valid SRT bytes."""
+        code = str(candidate.get("code") or "")
+        if not code:
+            raise OrganizerError("SubHD candidate has no subtitle code")
+
+        html = self._fetch_html(f"{self.BASE_URL}/a/{code}")
+
+        # Extract the embedded data-content
+        match = re.search(r'data-content="([^"]*)"', html)
+        if not match:
+            raise OrganizerError(
+                f"SubHD page /a/{code} has no data-content attribute "
+                "(site layout may have changed — see SKILL.md for manual fallback)"
+            )
+
+        raw_text = match.group(1)
+        import html as html_lib
+        raw_text = html_lib.unescape(raw_text)
+
+        # Convert from SubHD's custom number|text format to SRT
+        srt_bytes = self._convert_to_srt(raw_text)
+        return srt_bytes
+
+    @staticmethod
+    def _convert_to_srt(raw: str) -> bytes:
+        """Convert SubHD's embedded format to standard SRT and return bytes.
+
+        SubHD uses two variants of the embedded format:
+
+        **Variant A** (with line numbers)::
+
+            [00:11:21]
+            253|你能对着我再说一遍吗？
+            254|Can you say that to me?
+            255|
+            256|[00:11:23]
+            ...
+
+        **Variant B** (bare, no line numbers)::
+
+            [00:11:21]
+            你能对着我再说一遍吗？
+            Can you say that to me?
+
+            [00:11:23]
+            ...
+
+        Both convert to standard SRT with ``hh:mm:ss,000`` timestamps.
+        """
+        lines = raw.strip().split("\n")
+        has_number_prefix = any(
+            re.match(r"\d+\|", line) for line in lines if line.strip()
+        )
+
+        entries: list[tuple[str, list[str]]] = []
+        current_ts: str | None = None
+        current_lines: list[str] = []
+
+        if has_number_prefix:
+            # Variant A: number|text format
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                ts_match = re.match(r"(?:\d+\|)?\[(\d{2}:\d{2}:\d{2})\].*", line)
+                if ts_match:
+                    if current_ts is not None and current_lines:
+                        entries.append((current_ts, current_lines))
+                    current_ts = ts_match.group(1)
+                    current_lines = []
+                    continue
+                data_match = re.match(r"\d+\|(.+)", line)
+                if data_match:
+                    content = data_match.group(1).strip()
+                    if content:
+                        current_lines.append(content)
+        else:
+            # Variant B: bare format (no line numbers)
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                ts_match = re.match(r"\[(\d{2}:\d{2}:\d{2})\]", line)
+                if ts_match:
+                    if current_ts is not None and current_lines:
+                        entries.append((current_ts, current_lines))
+                    current_ts = ts_match.group(1)
+                    current_lines = []
+                else:
+                    if current_ts is not None and line:
+                        current_lines.append(line)
+
+        if current_ts is not None and current_lines:
+            entries.append((current_ts, current_lines))
+
+        if not entries:
+            raise OrganizerError(
+                "SubHD subtitle data yielded zero entries after parsing"
+            )
+
+        def _ts_to_sec(ts: str) -> int:
+            h, m, s = map(int, ts.split(":"))
+            return h * 3600 + m * 60 + s
+
+        def _sec_to_ts(sec: int) -> str:
+            h = sec // 3600
+            m = (sec % 3600) // 60
+            s = sec % 60
+            return f"{h:02d}:{m:02d}:{s:02d},000"
+
+        srt_parts: list[str] = []
+        for i, (ts, text_lines) in enumerate(entries):
+            num = i + 1
+            start_sec = _ts_to_sec(ts)
+            if i + 1 < len(entries):
+                end_sec = _ts_to_sec(entries[i + 1][0])
+                if end_sec <= start_sec:
+                    end_sec = start_sec + 3
+            else:
+                end_sec = start_sec + 3
+            srt_parts.append(
+                f"{num}\n{_sec_to_ts(start_sec)} --> {_sec_to_ts(end_sec)}\n"
+                f"{chr(10).join(text_lines)}\n\n"
+            )
+
+        result = "".join(srt_parts).encode("utf-8")
+        return result
+
+
 def decode_subtitle(data: bytes, expected_language: str = "") -> str:
     if b"\x00" in data[:200] and not data.startswith((b"\xff\xfe", b"\xfe\xff")):
         raise OrganizerError("subtitle contains unexpected NUL bytes")
@@ -409,6 +753,8 @@ def _providers() -> list[Any]:
     subdl_key = os.environ.get("SUBDL_API_KEY", "")
     if subdl_key:
         providers.append(SubDLClient(subdl_key))
+    # SubHD is always available (no API key required) as a last-resort scraper.
+    providers.append(SubHDClient())
     return providers
 
 
@@ -458,7 +804,7 @@ def ensure_state(state: dict[str, Any], mode: str, providers: list[Any] | None =
         if message not in warnings: warnings.append(message)
     provider_list = providers if providers is not None else _providers()
     if missing and not provider_list:
-        raise OrganizerError("missing required subtitles and no OPENSUBTITLES_API_KEY or SUBDL_API_KEY is configured")
+        raise OrganizerError("missing required subtitles and no OPENSUBTITLES_API_KEY or SUBDL_API_KEY is configured — SubHD scraped fallback also unavailable")
 
     planned, installed = [], []
     release_name = str(state.get("source", {}).get("original_release_name") or video.name)
@@ -466,7 +812,7 @@ def ensure_state(state: dict[str, Any], mode: str, providers: list[Any] | None =
         candidates, provider, provider_warnings = choose_candidates(provider_list, movie, release_name, language)
         warnings.extend(provider_warnings)
         if not candidates or provider is None:
-            raise OrganizerError(f"no reliable {language} subtitle was found on OpenSubtitles.com or SubDL")
+            raise OrganizerError(f"no reliable {language} subtitle was found on OpenSubtitles.com, SubDL, or SubHD")
         selected = candidates[0]
         extension = Path(str(selected.get("file_name") or "")).suffix.casefold()
         if extension not in ALLOWED_EXTENSIONS:

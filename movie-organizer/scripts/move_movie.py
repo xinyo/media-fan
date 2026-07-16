@@ -16,7 +16,10 @@ from typing import Any, Callable
 import xml.etree.ElementTree as ET
 
 
-DEFAULT_DESTINATION = Path(os.environ.get("MOVIE_OUTPUT", "/mnt/lib3/media/movie"))
+MOVIE_OUTPUT = os.environ.get("MOVIE_OUTPUT")
+if not MOVIE_OUTPUT:
+    raise ValueError("MOVIE_OUTPUT environment variable is required")
+DEFAULT_DESTINATION = Path(MOVIE_OUTPUT)
 SOUTHEAST_ASIAN = {"th", "vi", "id", "ms", "tl", "fil", "km", "my", "lo"}
 CHINESE = {"zh", "zh-cn", "zh-tw", "cmn", "yue"}
 SUBTITLE_EXTENSIONS = {".srt", ".ass", ".ssa"}

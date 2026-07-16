@@ -11,15 +11,15 @@ Organize exactly one waiting movie at a time. Treat identification and approval 
 
 Set these environment variables (copy `.env.example` to `.env`):
 
-| Variable | Default | Required |
-|---|---|---|
-| `MOVIE_INPUT` | `/mnt/lib3/waiting/movie--` | Path to unorganized movies |
-| `MOVIE_OUTPUT` | `/mnt/lib3/media/movie` | Root for organized movie folders |
-| `TMDB_API_KEY` | — | TMDB API key (get at themoviedb.org) |
-| `OPENSUBTITLES_API_KEY` | — | For subtitle download (optional) |
-| `SUB DL_API_KEY` | — | Fallback subtitle provider (optional) |
+| Variable | Description |
+|---|---|
+| `MOVIE_INPUT` | Path to unorganized movies |
+| `MOVIE_OUTPUT` | Root for organized movie folders |
+| `TMDB_API_KEY` | TMDB API key (get at themoviedb.org) |
+| `OPENSUBTITLES_API_KEY` | For subtitle download (optional) |
+| `SUB DL_API_KEY` | Fallback subtitle provider (optional) |
 
-All scripts fall back to sensible defaults when variables are unset. Only `TMDB_API_KEY` is strictly required for metadata and artwork.
+These variables are required at runtime. Copy `.env.example` to `.env` and fill in your paths.
 
 ## Safety contract
 
